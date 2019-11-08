@@ -40,6 +40,21 @@ namespace SzeregowanieZadan
             Weryfikuj("instance1.txt", "random4.txt");
             Weryfikuj("instance1.txt", "random5.txt");
             Weryfikuj("instance1.txt", "random6.txt");
+            var graph = new Graph(tasks);
+            var ants = new Ant[Config.ANTS];
+            var threads = new Thread[Config.ANTS];
+            for(var i = 0; i < Config.ANTS - 1; i++)
+            {
+                ants[i] = new Ant(graph, 4);
+                threads[i] = new Thread(ants[i].Run);
+            }
+            ants[Config.ANTS - 1] = new SpecialAnt(graph, 4);
+            threads[Config.ANTS - 1] = new Thread(ants[Config.ANTS - 1].Run);
+            foreach (var thread in threads)
+            {
+                thread.Start();
+            }
+            // threads[0].Start();
             Console.ReadKey();
         }
 
@@ -186,7 +201,8 @@ namespace SzeregowanieZadan
             Console.WriteLine($"W pliku wynikowym obliczony całkowity czas opóźnienia: {lines[0]}");
         }
     }
-    class Task
+
+    public class Task
     {
         public int Id { get; set; }
         public int Start { get; set; }
