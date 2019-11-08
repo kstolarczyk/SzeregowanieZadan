@@ -2,6 +2,7 @@
 {
     using System;
     using System.Collections.Generic;
+    using System.Threading;
 
     class Ant
     {
@@ -17,11 +18,14 @@
 
         private static object _mutex = new object();
 
+        protected static object[,] _mutexPheromones;
+
         private int _current;
 
         private List<int> _result;
 
         private int _visitedCount;
+        private static Barrier barrier = new Barrier(Config.ANTS);
 
         public Ant(Graph graph, int machinesCount)
         {
@@ -30,7 +34,22 @@
             _notVisited = new LinkedList<int>();
             _probabilities = new double[_tasksCount];
             _machines = InitializeMachines(machinesCount, _graph.MaxTime*2);
+            _mutexPheromones = new object[_tasksCount, _tasksCount];
+            InitializeMutexes(_tasksCount);
             _result = new List<int>(_tasksCount);
+        }
+
+        private void InitializeMutexes(int tasksCount)
+        {
+            for(var i = 0; i < tasksCount; i++)
+            {
+                for(var j = i+1; j< tasksCount; j++)
+                {
+                    _mutexPheromones[i, j] = new object();
+                    _mutexPheromones[j, i] = new object();
+                }
+            }
+
         }
 
         private LightMachine[] InitializeMachines(int machinesCount, int maxTime)
@@ -43,8 +62,10 @@
             return machines;
         }
 
-        public void Run()
+        public void Run(object obj)
         {
+            var cancelToken = (CancellationToken)obj;
+            barrier.SignalAndWait();
             for (var i = 0; i < Config.MAX_ITERATION; i++)
             {
                 _current = RandomGen.Next(_tasksCount);
@@ -61,30 +82,46 @@
                 }
 
                 var delay = NaiveAlgorithm(_result);
-                if (delay < _graph.BestResult)
+                if (delay < _graph.BestResultValue)
                 {
                     UpdateBestResult(delay);
                 }
                 ApplyPheromones(_result, delay);
+                if (cancelToken.IsCancellationRequested) break;
             }
+            barrier.SignalAndWait();
         }
 
         private void UpdateBestResult(int delay)
         {
             lock (_mutex)
             {
-                _graph.BestResult = Math.Min(_graph.BestResult, delay);
+                if(delay < _graph.BestResultValue)
+                {
+                    _graph.BestResultValue = delay;
+                    CopyCurrentResult();
+                }
             }
-            Console.WriteLine($"Best result: {delay}");
+        }
+
+        private void CopyCurrentResult()
+        {
+            for(var i = 0; i < _tasksCount; i++)
+            {
+                _graph.BestResult[i] = _result[i];
+            }
         }
 
         protected virtual void ApplyPheromones(List<int> result, int delay)
         {
-            var quality = (double)_graph.BestResult / delay;
+            var quality = (double)_graph.BestResultValue / delay;
             var pheromones = Config.QF * quality;
             for (var i = 0; i < _tasksCount - 1; i++)
             {
-                _graph.Pheromones[result[i], result[i + 1]] += pheromones;
+                lock(_mutexPheromones[result[i], result[i+1]])
+                {
+                    _graph.Pheromones[result[i], result[i + 1]] = pheromones;
+                }
             }
         }
 
@@ -145,23 +182,33 @@
                 var currentTime = currentTask.Start;
                 while (!added)
                 {
-                    for(var i = 0; i < _machines.Length; i++)
+                    for (var i = 0; i < _machines.Length; i++)
                     {
                         if (_machines[i].LockTimespan(currentTime, currentTask.Duration))
                         {
                             totalDelay += Math.Max(0, currentTime + currentTask.Duration - currentTask.Estimated);
-                            added = true; 
+                            added = true;
                             break;
                         }
                     }
                     currentTime++;
+                    if(currentTime + currentTask.Duration == _graph.MaxTime*2)
+                    {
+                        ClearMachines();
+                        return int.MaxValue;
+                    }
                 }
             }
+            ClearMachines();
+            return totalDelay;
+        }
+
+        private void ClearMachines()
+        {
             foreach (var lightMachine in _machines)
             {
                 lightMachine.ClearLocked();
             }
-            return totalDelay;
         }
     }
 
@@ -174,8 +221,14 @@
             {
                 for (var j = i+1; j < _tasksCount; j++)
                 {
-                    _graph.Pheromones[i,j] *= Config.EVAPORATION;
-                    _graph.Pheromones[j,i] *= Config.EVAPORATION;
+                    lock(_mutexPheromones[i,j])
+                    {
+                        _graph.Pheromones[i, j] *= Config.EVAPORATION;
+                    }
+                    lock(_mutexPheromones[j,i])
+                    {
+                        _graph.Pheromones[j, i] *= Config.EVAPORATION;
+                    }
                 }
             }
         }

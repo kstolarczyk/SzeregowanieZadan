@@ -5,44 +5,49 @@ using System.Text;
 
 namespace SzeregowanieZadan
 {
+    using System.Diagnostics;
     using System.Linq;
     using System.Threading;
-    using System.Threading.Tasks;
 
     class Program
     {
 
         static void Main(string[] args)
         {
-            // Generate(500, "instance1.txt");
-            var tasks = ParseTasks(File.ReadAllLines("instance1.txt"));
-            var machines = NaiveAlgorithm(tasks);
+            Generate(500, "instance1.txt");
+            var tasks = ParseTasks(File.ReadAllLines("instance1.txt"), out var maxTime);
+            var machines = NaiveAlgorithm(tasks, maxTime*2);
             CreateResultFile(machines, "naive.txt");
-            machines = SortedAlgorithm(tasks);
+            machines = SortedAlgorithm(tasks, maxTime * 2);
             CreateResultFile(machines, "sorted.txt");
-            machines = RandomAlgorithm(tasks);
+            machines = RandomAlgorithm(tasks, maxTime * 2);
             CreateResultFile(machines, "random1.txt");
-            machines = RandomAlgorithm(tasks);
+            machines = RandomAlgorithm(tasks, maxTime * 2);
             CreateResultFile(machines, "random2.txt");
-            machines = RandomAlgorithm(tasks);
+            machines = RandomAlgorithm(tasks, maxTime * 2);
             CreateResultFile(machines, "random3.txt");
-            machines = RandomAlgorithm(tasks);
+            machines = RandomAlgorithm(tasks, maxTime * 2);
             CreateResultFile(machines, "random4.txt");
-            machines = RandomAlgorithm(tasks);
+            machines = RandomAlgorithm(tasks, maxTime * 2);
             CreateResultFile(machines, "random5.txt");
-            machines = RandomAlgorithm(tasks);
+            machines = RandomAlgorithm(tasks, maxTime * 2);
             CreateResultFile(machines, "random6.txt");
+            Console.WriteLine("\n --- Algorytm Naiwny ---");
             Weryfikuj("instance1.txt", "naive.txt");
+            Console.WriteLine("\n --- Algorytm naiwny z sortowaniem po czasie gotowości zadań ---");
             Weryfikuj("instance1.txt", "sorted.txt");
+            Console.WriteLine("\n --- Algorytm naiwny z losowym posortowaniem #1");
             Weryfikuj("instance1.txt", "random1.txt");
+            Console.WriteLine("\n --- Algorytm naiwny z losowym posortowaniem #2");
             Weryfikuj("instance1.txt", "random2.txt");
+            Console.WriteLine("\n --- Algorytm naiwny z losowym posortowaniem #3");
             Weryfikuj("instance1.txt", "random3.txt");
-            Weryfikuj("instance1.txt", "random4.txt");
-            Weryfikuj("instance1.txt", "random5.txt");
-            Weryfikuj("instance1.txt", "random6.txt");
             var graph = new Graph(tasks);
             var ants = new Ant[Config.ANTS];
             var threads = new Thread[Config.ANTS];
+            var ctk = new CancellationTokenSource(100);
+            var timer = new Stopwatch();
+            var whenStop = 10 * graph.Tasks.Count;
             for(var i = 0; i < Config.ANTS - 1; i++)
             {
                 ants[i] = new Ant(graph, 4);
@@ -50,15 +55,42 @@ namespace SzeregowanieZadan
             }
             ants[Config.ANTS - 1] = new SpecialAnt(graph, 4);
             threads[Config.ANTS - 1] = new Thread(ants[Config.ANTS - 1].Run);
+            Thread.CurrentThread.Priority = ThreadPriority.Highest;
+            timer.Start();
             foreach (var thread in threads)
             {
-                thread.Start();
+                thread.Start(ctk.Token);
             }
-            // threads[0].Start();
+            while(timer.ElapsedMilliseconds < whenStop)
+            {
+                Thread.Sleep(100);
+            }
+            ctk.Cancel();
+            foreach(var thread in threads)
+            {
+                thread.Join();
+            }
+            timer.Stop();
+
+            Console.WriteLine($"\nUpłynęło {timer.ElapsedMilliseconds} ms");
+            ExportResult(graph, "ACO.txt");
+            Console.WriteLine("\n Algorytm Mrówkowy (ACO)");
+            Weryfikuj("instance1.txt", "ACO.txt");
             Console.ReadKey();
         }
 
-        private static void CreateResultFile(IEnumerable<Machine> machines, string resultName)
+        private static void ExportResult(Graph graph, string fileName)
+        {
+            var taskList = new List<Task>(graph.Tasks.Count);
+            foreach (var taskId in graph.BestResult)
+            {
+                taskList.Add(graph.Tasks[taskId]);
+            }
+            var machines = NaiveAlgorithm(taskList, graph.MaxTime * 2);
+            CreateResultFile(machines, fileName);
+        }
+
+        public static void CreateResultFile(IEnumerable<Machine> machines, string resultName)
         {
             var totalDelay = 0;
             foreach (var machine in machines)
@@ -103,21 +135,21 @@ namespace SzeregowanieZadan
             File.WriteAllText(fileName, strBuilder.ToString());
         }
 
-        public static IEnumerable<Machine> SortedAlgorithm(IEnumerable<Task> tasks)
+        public static IEnumerable<Machine> SortedAlgorithm(IEnumerable<Task> tasks, int max)
         {
             var sorted = tasks.OrderBy(t => t.Start);
-            return NaiveAlgorithm(sorted);
+            return NaiveAlgorithm(sorted, max);
         }
 
-        public static IEnumerable<Machine> RandomAlgorithm(IEnumerable<Task> tasks)
+        public static IEnumerable<Machine> RandomAlgorithm(IEnumerable<Task> tasks, int max)
         {
             var sorted = tasks.OrderBy(t => Guid.NewGuid());
-            return NaiveAlgorithm(sorted);
+            return NaiveAlgorithm(sorted, max);
         }
 
-        public static IEnumerable<Machine> NaiveAlgorithm(IEnumerable<Task> tasks)
+        public static IEnumerable<Machine> NaiveAlgorithm(IEnumerable<Task> tasks, int max)
         {
-            var machines = InitializeMachines(Config.MAX_TIME*2);
+            var machines = InitializeMachines(max);
             foreach (var task in tasks)
             {
                 var added = false;
@@ -144,7 +176,7 @@ namespace SzeregowanieZadan
             return machines;
         }
 
-        private static List<Machine> InitializeMachines(int max)
+        public static List<Machine> InitializeMachines(int max)
         {
             var machines = new List<Machine>(Config.MACHINES_COUNT);
             for (var i = 0; i < Config.MACHINES_COUNT; i++)
@@ -154,9 +186,10 @@ namespace SzeregowanieZadan
             return machines;
         }
 
-        private static List<Task> ParseTasks(string[] lines)
+        private static List<Task> ParseTasks(string[] lines, out int maxTime)
         {
             var tasks = new List<Task>(int.Parse(lines[0]));
+            maxTime = 0;
             for (var i = 1; i < lines.Length; i++)
             {
                 var split = lines[i].Split(' ');
@@ -168,6 +201,7 @@ namespace SzeregowanieZadan
                             Estimated = int.Parse(split[2]),
                             Id = i-1
                         });
+                maxTime = Math.Max(maxTime, tasks[i - 1].Estimated);
             }
             return tasks;
         }
@@ -175,8 +209,8 @@ namespace SzeregowanieZadan
         public static void Weryfikuj(string instance, string result)
         {
             var lines = File.ReadAllLines(instance);
-            var tasks = ParseTasks(lines);
-            var machines = InitializeMachines(Config.MAX_TIME*2);
+            var tasks = ParseTasks(lines, out var maxTime);
+            var machines = InitializeMachines(maxTime*2);
             lines = File.ReadAllLines(result);
             var totalDelay = 0;
             for (var i = 1; i < lines.Length; i++)
@@ -210,7 +244,7 @@ namespace SzeregowanieZadan
         public int Estimated { get; set; }
     }
 
-    class Machine
+    public class Machine
     {
         private bool[] locked;
         public SortedDictionary<int, Task> Tasks { get; private set; }

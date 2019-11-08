@@ -11,15 +11,17 @@
             var tasksCount = tasks.Count;
             Pheromones = new double[tasksCount, tasksCount];
             InitPheromonesOnEdges(tasksCount);
-
+            BestResult = new int[tasksCount];
+             BestResultValue = int.MaxValue;
             Edges = new List<List<Edge>>(tasksCount);
             InitEdges(tasks, tasksCount);
-            BestResult = tasksCount * 2;
         }
 
         public List<Task> Tasks { get; }
-        public int BestResult { get; set; }
+        public int[] BestResult { get; set; }
         public int MaxTime { get; private set; }
+        public int BestId { get; set; }
+        public int BestResultValue { get; set; }
         private void InitEdges(List<Task> tasks, int tasksCount)
         {
             MaxTime = 0;
