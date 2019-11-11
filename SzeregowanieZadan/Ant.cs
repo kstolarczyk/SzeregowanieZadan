@@ -14,7 +14,7 @@
 
         private double[] _probabilities;
 
-        private LightMachine[] _machines;
+        private Machine[] _machines;
 
         private static object _mutex = new object();
 
@@ -33,7 +33,7 @@
             _tasksCount = graph.Tasks.Count;
             _notVisited = new LinkedList<int>();
             _probabilities = new double[_tasksCount];
-            _machines = InitializeMachines(machinesCount, _graph.MaxTime*2);
+            _machines = InitializeMachines(machinesCount);
             _mutexPheromones = new object[_tasksCount, _tasksCount];
             InitializeMutexes(_tasksCount);
             _result = new List<int>(_tasksCount);
@@ -52,12 +52,12 @@
 
         }
 
-        private LightMachine[] InitializeMachines(int machinesCount, int maxTime)
+        private Machine[] InitializeMachines(int machinesCount)
         {
-            var machines = new LightMachine[machinesCount];
+            var machines = new Machine[machinesCount];
             for (var i = 0; i < machinesCount; i++)
             {
-                machines[i] = new LightMachine(maxTime);
+                machines[i] = new Machine();
             }
             return machines;
         }
@@ -175,29 +175,50 @@
         public int NaiveAlgorithm(IEnumerable<int> result)
         {
             var totalDelay = 0;
+            var totalTasks = 0;
             foreach (var taskIter in result)
             {
+                if (totalDelay > _graph.BestResultValue)
+                {
+                    return totalDelay * (_tasksCount / totalTasks);
+                }
+
                 var added = false;
                 var currentTask = _graph.Tasks[taskIter];
                 var currentTime = currentTask.Start;
-                while (!added)
+                var endTime = currentTask.Duration + currentTime - 1;
+
+         
+                for (var i = 0; i < _machines.Length; i++)
                 {
-                    for (var i = 0; i < _machines.Length; i++)
+                    if (_machines[i].AddTask(currentTime, endTime))
                     {
-                        if (_machines[i].LockTimespan(currentTime, currentTask.Duration))
-                        {
-                            totalDelay += Math.Max(0, currentTime + currentTask.Duration - currentTask.Estimated);
-                            added = true;
-                            break;
-                        }
-                    }
-                    currentTime++;
-                    if(currentTime + currentTask.Duration == _graph.MaxTime*2)
-                    {
-                        ClearMachines();
-                        return int.MaxValue;
+                        totalDelay += Math.Max(0, endTime - currentTask.Estimated);
+                        added = true;
+                        totalTasks++;
+                        break;
                     }
                 }
+
+                if(added) continue;
+                
+                var machineIter = 0;
+                currentTime = int.MaxValue;
+                for (var i = 0; i < _machines.Length; i++)
+                {
+                    var ff = _machines[i].FirstFree(currentTask.Start, endTime);
+                    if (ff < currentTime)
+                    {
+                        currentTime = ff;
+                        machineIter = i;
+                    }
+                }
+
+                endTime = currentTime + currentTask.Duration - 1;
+                _machines[machineIter].AddTask(currentTime, endTime);
+                totalDelay += Math.Max(0, endTime - currentTask.Estimated);
+                totalTasks++;
+                
             }
             ClearMachines();
             return totalDelay;
@@ -205,9 +226,9 @@
 
         private void ClearMachines()
         {
-            foreach (var lightMachine in _machines)
+            foreach (var machine in _machines)
             {
-                lightMachine.ClearLocked();
+                machine.ClearFree();
             }
         }
     }

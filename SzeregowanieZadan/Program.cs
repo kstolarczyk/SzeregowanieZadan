@@ -9,39 +9,34 @@ namespace SzeregowanieZadan
     using System.Linq;
     using System.Threading;
 
+    class FreeComparer : IComparer<Interval>
+    {
+        public int Compare(Interval x, Interval y)
+        {
+            return x.IsContainedIn(y);
+        }
+    }
     class Program
     {
 
         static void Main(string[] args)
         {
-            Generate(500, "instance1.txt");
-            var tasks = ParseTasks(File.ReadAllLines("instance1.txt"), out var maxTime);
-            var machines = NaiveAlgorithm(tasks, maxTime*2);
+           
+            //GeneratePro(500,4, "instance1pro.txt");
+            var tasks = ParseTasks(File.ReadAllLines("instance1pro.txt"), out var maxTime);
+            var machines = NaiveAlgorithm(tasks);
             CreateResultFile(machines, "naive.txt");
-            machines = SortedAlgorithm(tasks, maxTime * 2);
+            machines = SortedAlgorithm(tasks);
             CreateResultFile(machines, "sorted.txt");
-            machines = RandomAlgorithm(tasks, maxTime * 2);
-            CreateResultFile(machines, "random1.txt");
-            machines = RandomAlgorithm(tasks, maxTime * 2);
-            CreateResultFile(machines, "random2.txt");
-            machines = RandomAlgorithm(tasks, maxTime * 2);
-            CreateResultFile(machines, "random3.txt");
-            machines = RandomAlgorithm(tasks, maxTime * 2);
-            CreateResultFile(machines, "random4.txt");
-            machines = RandomAlgorithm(tasks, maxTime * 2);
-            CreateResultFile(machines, "random5.txt");
-            machines = RandomAlgorithm(tasks, maxTime * 2);
-            CreateResultFile(machines, "random6.txt");
+            machines = RandomAlgorithm(tasks);
+            CreateResultFile(machines, "random.txt");
             Console.WriteLine("\n --- Algorytm Naiwny ---");
-            Weryfikuj("instance1.txt", "naive.txt");
+            Weryfikuj("instance1pro.txt", "naive.txt");
             Console.WriteLine("\n --- Algorytm naiwny z sortowaniem po czasie gotowości zadań ---");
-            Weryfikuj("instance1.txt", "sorted.txt");
-            Console.WriteLine("\n --- Algorytm naiwny z losowym posortowaniem #1");
-            Weryfikuj("instance1.txt", "random1.txt");
-            Console.WriteLine("\n --- Algorytm naiwny z losowym posortowaniem #2");
-            Weryfikuj("instance1.txt", "random2.txt");
-            Console.WriteLine("\n --- Algorytm naiwny z losowym posortowaniem #3");
-            Weryfikuj("instance1.txt", "random3.txt");
+            Weryfikuj("instance1pro.txt", "sorted.txt");
+            Console.WriteLine("\n --- Algorytm naiwny z losowym posortowaniem");
+            Weryfikuj("instance1pro.txt", "random.txt");
+
             var graph = new Graph(tasks);
             var ants = new Ant[Config.ANTS];
             var threads = new Thread[Config.ANTS];
@@ -75,7 +70,7 @@ namespace SzeregowanieZadan
             Console.WriteLine($"\nUpłynęło {timer.ElapsedMilliseconds} ms");
             ExportResult(graph, "ACO.txt");
             Console.WriteLine("\n Algorytm Mrówkowy (ACO)");
-            Weryfikuj("instance1.txt", "ACO.txt");
+            Weryfikuj("instance1pro.txt", "ACO.txt");
             Console.ReadKey();
         }
 
@@ -86,11 +81,11 @@ namespace SzeregowanieZadan
             {
                 taskList.Add(graph.Tasks[taskId]);
             }
-            var machines = NaiveAlgorithm(taskList, graph.MaxTime * 2);
+            var machines = NaiveAlgorithm(taskList);
             CreateResultFile(machines, fileName);
         }
 
-        public static void CreateResultFile(IEnumerable<Machine> machines, string resultName)
+        public static void CreateResultFile(IEnumerable<MachineTest> machines, string resultName)
         {
             var totalDelay = 0;
             foreach (var machine in machines)
@@ -135,53 +130,120 @@ namespace SzeregowanieZadan
             File.WriteAllText(fileName, strBuilder.ToString());
         }
 
-        public static IEnumerable<Machine> SortedAlgorithm(IEnumerable<Task> tasks, int max)
-        {
-            var sorted = tasks.OrderBy(t => t.Start);
-            return NaiveAlgorithm(sorted, max);
+        public static void GeneratePro(int tasksCount, int machinesCount, string fileName) {
+            var endTime = RandomGen.Next(tasksCount, tasksCount*tasksCount);
+            var machinesRands = new int[machinesCount];
+            var machinesEndTime = new int[machinesCount];
+            var sum = 0;
+            var machines = InitializeMachines(Config.MACHINES_COUNT);
+            for (var i = 0; i < machinesCount; i++) {
+                sum += machinesRands[i] = RandomGen.Next(10) + 1;
+            }                                                 
+            var tasks = new List<Task>(tasksCount);
+            var taskId = 0;
+            for(var i = 0; i < machinesCount; i++)
+            {
+                machinesRands[i] *= tasksCount / sum;
+                var currentTime = 0;
+                var avgTime = endTime / machinesRands[i];
+                while (currentTime < endTime)
+                {
+                    var taskDuration = RandomGen.Next(avgTime * 2) + 1;
+                    var taskReady = RandomGen.Next(currentTime + 1);
+                    var estimatedEnd = currentTime + taskDuration + RandomGen.Next(avgTime);
+                    tasks.Add(new Task { Duration = taskDuration, Estimated = estimatedEnd, Start = taskReady });
+                    machines[i].AddTask(new Task {Duration = taskDuration, Estimated = estimatedEnd, Start = currentTime, Id = taskId++});
+                    currentTime += taskDuration;
+                }
+
+                machinesEndTime[i] = currentTime;
+            }
+
+            for (var i = tasks.Count; i < tasksCount; i++)
+            {
+                var j = i % machinesCount;
+                var avgTime = endTime / machinesRands[j];
+                var taskDuration = RandomGen.Next(avgTime * 2) + 1;
+                var taskReady = RandomGen.Next(machinesEndTime[j] + 1);
+                var estimatedEnd = machinesEndTime[j] + taskDuration + RandomGen.Next(avgTime);
+                tasks.Add(new Task { Duration = taskDuration, Estimated = estimatedEnd, Start = taskReady });
+                machines[j].AddTask(new Task {Duration = taskDuration, Estimated = estimatedEnd, Start = machinesEndTime[j], Id = taskId++});
+                machinesEndTime[j] += taskDuration;
+            }
+
+            CreateResultFile(machines, "optimum.txt");
+            var strBuilder = new StringBuilder($"{tasksCount}\n");
+            var shuffled = tasks.OrderBy(t => Guid.NewGuid()).ToList();
+            for (var i = 0; i < tasksCount; i++)
+            {
+                strBuilder.AppendLine($"{shuffled[i].Duration} {shuffled[i].Start} {shuffled[i].Estimated}");
+            }
+            File.WriteAllText(fileName, strBuilder.ToString());
         }
 
-        public static IEnumerable<Machine> RandomAlgorithm(IEnumerable<Task> tasks, int max)
+        public static IEnumerable<MachineTest> SortedAlgorithm(IEnumerable<Task> tasks)
+        {
+            var sorted = tasks.OrderBy(t => t.Duration);
+            return NaiveAlgorithm(sorted);
+        }
+
+        public static IEnumerable<MachineTest> RandomAlgorithm(IEnumerable<Task> tasks)
         {
             var sorted = tasks.OrderBy(t => Guid.NewGuid());
-            return NaiveAlgorithm(sorted, max);
+            return NaiveAlgorithm(sorted);
         }
 
-        public static IEnumerable<Machine> NaiveAlgorithm(IEnumerable<Task> tasks, int max)
+        public static IEnumerable<MachineTest> NaiveAlgorithm(IEnumerable<Task> tasks)
         {
-            var machines = InitializeMachines(max);
+            var totalDelay = 0;
+            var machines = InitializeMachines(Config.MACHINES_COUNT);
             foreach (var task in tasks)
             {
+                
                 var added = false;
-                for(var i = 0; i < machines.Count; i++)
+                var currentTask = task;
+                var currentTime = currentTask.Start;
+                var endTime = currentTask.Duration + currentTime - 1;
+
+
+                for (var i = 0; i < machines.Count; i++)
                 {
-                    if (machines[i].AddTask(task)) { added = true; break; }
-                }
-                if(!added)
-                {
-                    var bestIndex = 0;
-                    var bestResult = int.MaxValue;
-                    for(var i = 0; i < machines.Count; i++)
+                    if (machines[i].AddTask(currentTask))
                     {
-                        var current = machines[i].FirstFree(task);
-                        if(current < bestResult)
-                        {
-                            bestResult = current;
-                            bestIndex = i;
-                        }
+                        totalDelay += Math.Max(0, endTime - currentTask.Estimated);
+                        added = true;
+                        break;
                     }
-                    machines[bestIndex].AddTask(task, bestResult);
                 }
+
+                if (added) continue;
+
+                var machineIter = 0;
+                currentTime = int.MaxValue;
+                for (var i = 0; i < machines.Count; i++)
+                {
+                    var ff = machines[i].FirstFree(currentTask.Start, endTime);
+                    if (ff < currentTime)
+                    {
+                        currentTime = ff;
+                        machineIter = i;
+                    }
+                }
+
+                endTime = currentTime + currentTask.Duration - 1;
+                currentTask.Start = currentTime;
+                machines[machineIter].AddTask(currentTask);
+                totalDelay += Math.Max(0, endTime - currentTask.Estimated);
+
             }
             return machines;
         }
-
-        public static List<Machine> InitializeMachines(int max)
+        public static List<MachineTest> InitializeMachines(int count)
         {
-            var machines = new List<Machine>(Config.MACHINES_COUNT);
-            for (var i = 0; i < Config.MACHINES_COUNT; i++)
+            var machines = new List<MachineTest>(count);
+            for (var i = 0; i < count; i++)
             {
-                machines.Add(new Machine(max));
+                machines.Add(new MachineTest());
             }
             return machines;
         }
@@ -210,7 +272,7 @@ namespace SzeregowanieZadan
         {
             var lines = File.ReadAllLines(instance);
             var tasks = ParseTasks(lines, out var maxTime);
-            var machines = InitializeMachines(maxTime*2);
+            var machines = InitializeMachines(Config.MACHINES_COUNT);
             lines = File.ReadAllLines(result);
             var totalDelay = 0;
             for (var i = 1; i < lines.Length; i++)
@@ -226,9 +288,9 @@ namespace SzeregowanieZadan
                     currentTask.Start = Math.Max(currentTask.Start, time);
                     time = currentTask.Start;
 
-                    currentMachine.AddTask(currentTask, time);
+                    currentMachine.AddTask(time, time + currentTask.Duration - 1);
                     time += currentTask.Duration;
-                    totalDelay += Math.Max(0, time - currentTask.Estimated);
+                    totalDelay += Math.Max(0, time - currentTask.Estimated + 1);
                 }
             }
             Console.WriteLine($"Całkowity czas opóźnienia: {totalDelay}");
@@ -244,50 +306,23 @@ namespace SzeregowanieZadan
         public int Estimated { get; set; }
     }
 
-    public class Machine
+    public class MachineTest : Machine
     {
-        private bool[] locked;
         public SortedDictionary<int, Task> Tasks { get; private set; }
-        public Machine(int max)
+
+        public MachineTest() : base()
         {
-            locked = new bool[max];
             Tasks = new SortedDictionary<int, Task>();
         }
-
-        private bool CheckFree(int start, int duration)
-        {
-            for(var i = start; i < start + duration; i++)
-            {
-                if (locked[i])
-                    return false;
-            }
-            return true;
-        }
-
         public bool AddTask(Task task)
         {
-            if (!CheckFree(task.Start, task.Duration)) return false;
-            for(var i = task.Start; i < task.Start + task.Duration; i++)
+            var result = base.AddTask(task.Start, task.Start + task.Duration - 1);
+            if (result)
             {
-                locked[i] = true;
+                Tasks.Add(task.Start, task);
             }
-            Tasks.Add(task.Start, task);
-            return true;
-        }
 
-        public void AddTask(Task task, int start) {
-            for(var i = start; i < start + task.Duration; i++)
-            {
-                locked[i] = true;
-            }
-            Tasks.Add(start, task);
-        }
-
-        public int FirstFree(Task task)
-        {
-            var start = task.Start;
-            while(!CheckFree(start, task.Duration)) { start++; }
-            return start;
+            return result;
         }
     }
 }
