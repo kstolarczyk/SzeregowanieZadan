@@ -4,7 +4,7 @@
     using System.Collections.Generic;
     using System.Threading;
 
-    class Ant
+    public class Ant
     {
         protected Graph _graph;
 
@@ -43,7 +43,7 @@
         {
             for(var i = 0; i < tasksCount; i++)
             {
-                for(var j = i+1; j< tasksCount; j++)
+                for(var j = i+1; j < tasksCount; j++)
                 {
                     _mutexPheromones[i, j] = new object();
                     _mutexPheromones[j, i] = new object();
@@ -87,12 +87,13 @@
                     UpdateBestResult(delay);
                 }
                 ApplyPheromones(_result, delay);
-                if (cancelToken.IsCancellationRequested) break;
+                if (cancelToken.IsCancellationRequested)
+                    break;
             }
             barrier.SignalAndWait();
         }
 
-        private void UpdateBestResult(int delay)
+        public void UpdateBestResult(int delay)
         {
             lock (_mutex)
             {
@@ -100,48 +101,52 @@
                 {
                     _graph.BestResultValue = delay;
                     CopyCurrentResult();
+                    Console.WriteLine($"Best value: {delay}");
                 }
             }
         }
 
-        private void CopyCurrentResult()
+        public void CopyCurrentResult()
         {
-            for(var i = 0; i < _tasksCount; i++)
+            for(var i = 0; i < _result.Count; i++)
             {
                 _graph.BestResult[i] = _result[i];
             }
         }
 
-        protected virtual void ApplyPheromones(List<int> result, int delay)
+        public virtual void ApplyPheromones(List<int> result, int delay)
         {
             var quality = (double)_graph.BestResultValue / delay;
             var pheromones = Config.QF * quality;
             for (var i = 0; i < _tasksCount - 1; i++)
             {
-                lock(_mutexPheromones[result[i], result[i+1]])
+                var x = result[i];
+                var y = result[i + 1];
+                lock(_mutexPheromones[x, y])
                 {
-                    _graph.Pheromones[result[i], result[i + 1]] = pheromones;
+                    _graph.Pheromones[x, y] += pheromones;
                 }
             }
         }
 
-        private int ChooseNext(int from)
+        public int ChooseNext(int from)
         {
             ComputeProbabilities(from);
             var rnd = RandomGen.NextDouble();
             return FindNext(rnd);
         }
 
-        private int FindNext(double rnd)
+        public int FindNext(double rnd)
         {
             foreach (var i in _notVisited)
             {
-                if (rnd < _probabilities[i]) return i;
+                if (rnd < _probabilities[i])
+                    return i;
             }
             throw new Exception($"Nie znaleziono następnego elementu dla rnd = {rnd}");
         }
 
-        private void InitializeNotVisited(int start)
+        public void InitializeNotVisited(int start)
         {
             _notVisited.Clear();
             for (var i = 0; i < _tasksCount; i++)
@@ -151,14 +156,24 @@
             }
         }
 
-        private void ComputeProbabilities(int from)
+        public double[] GetProbabilities()
+        {
+            return _probabilities;
+        }
+
+        public LinkedList<int> GetNotVisited()
+        {
+            return _notVisited;
+        }
+
+        public void ComputeProbabilities(int from)
         {
             var sum = 0.0;
             foreach (var next in _notVisited)
             {
                 var distance = _graph.Edges[from][next].TimeDistance + 1;
                 var pheromone = _graph.Pheromones[from, next];
-                var value = Math.Pow(1.0 / distance, Config.BETA) * Math.Pow(pheromone, Config.ALPHA);
+                var value = Math.Pow(1 + (10.0 / distance), Config.BETA) * Math.Pow(pheromone, Config.ALPHA);
                 _probabilities[next] = value;
                 sum += value;
             }
@@ -224,7 +239,7 @@
             return totalDelay;
         }
 
-        private void ClearMachines()
+        public void ClearMachines()
         {
             foreach (var machine in _machines)
             {
@@ -233,9 +248,9 @@
         }
     }
 
-    class SpecialAnt : Ant
+    public class SpecialAnt : Ant
     {
-        protected override void ApplyPheromones(List<int> result, int delay)
+        public override void ApplyPheromones(List<int> result, int delay)
         {
             base.ApplyPheromones(result, delay);
             for (var i = 0; i < _tasksCount; i++)
@@ -257,43 +272,6 @@
         public SpecialAnt(Graph graph, int machinesCount)
             : base(graph, machinesCount)
         {
-        }
-    }
-
-    class LightMachine
-    {
-        private bool[] _locked;
-
-        public LightMachine(int maxCount)
-        {
-            _locked = new bool[maxCount];
-        }
-
-        public bool CheckFree(int start, int duration)
-        {
-            for (var i = start; i < start + duration; i++)
-            {
-                if (_locked[i]) return false;
-            }
-            return true;
-        }
-
-        public bool LockTimespan(int start, int duration)
-        {
-            if (!CheckFree(start, duration)) return false;
-            for (var i = start; i < start + duration; i++)
-            {
-                _locked[i] = true;
-            }
-            return true;
-        }
-
-        public void ClearLocked()
-        {
-            for (var i = 0; i < _locked.Length; i++)
-            {
-                _locked[i] = false;
-            }
         }
     }
 }

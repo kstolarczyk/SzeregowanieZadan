@@ -12,7 +12,7 @@
             Pheromones = new double[tasksCount, tasksCount];
             InitPheromonesOnEdges(tasksCount);
             BestResult = new int[tasksCount];
-             BestResultValue = int.MaxValue;
+             BestResultValue = 157000;
             Edges = new List<List<Edge>>(tasksCount);
             InitEdges(tasks, tasksCount);
         }
@@ -32,8 +32,8 @@
                 for (var j = 0; j < tasksCount; j++)
                 {
                     var targetTask = tasks[j];
-                    var distance = Math.Max(0, targetTask.Start - currentTask.Start);
-                    Edges[i].Add(new Edge(distance));
+                    var distance = targetTask.Estimated - targetTask.Duration - currentTask.Estimated + currentTask.Duration;
+                    Edges[i].Add(new Edge(Math.Abs(distance) + 1));
                 }
                 MaxTime = Math.Max(MaxTime, currentTask.Estimated);
             }

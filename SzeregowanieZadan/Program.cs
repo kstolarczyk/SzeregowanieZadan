@@ -22,8 +22,8 @@ namespace SzeregowanieZadan
         static void Main(string[] args)
         {
            
-            //GeneratePro(500,4, "instance1pro.txt");
-            var tasks = ParseTasks(File.ReadAllLines("instance1pro.txt"), out var maxTime);
+            // GeneratePro(250,4, "instance1pro.txt");
+            var tasks = ParseTasks(File.ReadAllLines("instance1pro.txt"));
             var machines = NaiveAlgorithm(tasks);
             CreateResultFile(machines, "naive.txt");
             machines = SortedAlgorithm(tasks);
@@ -36,13 +36,14 @@ namespace SzeregowanieZadan
             Weryfikuj("instance1pro.txt", "sorted.txt");
             Console.WriteLine("\n --- Algorytm naiwny z losowym posortowaniem");
             Weryfikuj("instance1pro.txt", "random.txt");
+            Weryfikuj("instance1pro.txt", "optimum.txt");
 
             var graph = new Graph(tasks);
             var ants = new Ant[Config.ANTS];
             var threads = new Thread[Config.ANTS];
-            var ctk = new CancellationTokenSource(100);
+            var ctk = new CancellationTokenSource();
             var timer = new Stopwatch();
-            var whenStop = 10 * graph.Tasks.Count;
+            var whenStop = 1000 * graph.Tasks.Count;
             for(var i = 0; i < Config.ANTS - 1; i++)
             {
                 ants[i] = new Ant(graph, 4);
@@ -56,11 +57,11 @@ namespace SzeregowanieZadan
             {
                 thread.Start(ctk.Token);
             }
-            while(timer.ElapsedMilliseconds < whenStop)
-            {
-                Thread.Sleep(100);
-            }
-            ctk.Cancel();
+            // while(timer.ElapsedMilliseconds < whenStop)
+            // {
+            //     Thread.Sleep(100);
+            // }
+            // ctk.Cancel();
             foreach(var thread in threads)
             {
                 thread.Join();
@@ -104,32 +105,6 @@ namespace SzeregowanieZadan
             File.WriteAllText(resultName, strBuilder.ToString());
         }
 
-        public static void Generate(int n, string fileName)
-        {
-            var rnd = new Random();
-            var tasks = new List<Task>(n);
-            var sum = 0;
-            var maxDuration = Config.MAX_TIME * 4 / n;
-            for(var i = 0; i < n; i++)
-            {
-                var duration = rnd.Next(maxDuration * 2) + 1;
-                tasks.Add(new Task { Duration = duration });
-                sum += duration;
-            }
-            var avgTaskTime = sum / n;
-            var avgMachineTime = sum / Config.MACHINES_COUNT;
-            var strBuilder = new StringBuilder().AppendLine(n.ToString());
-            for(var i = 0; i < n; i++)
-            {
-                var startTime = rnd.Next(avgMachineTime);
-                var d = (startTime + tasks[i].Duration) * (100 + Config.MAX_DUE)/100.0;
-                tasks[i].Start = startTime;
-                tasks[i].Estimated = (int)d;
-                strBuilder.AppendLine($"{tasks[i].Duration} {tasks[i].Start} {tasks[i].Estimated}");
-            }
-            File.WriteAllText(fileName, strBuilder.ToString());
-        }
-
         public static void GeneratePro(int tasksCount, int machinesCount, string fileName) {
             var endTime = RandomGen.Next(tasksCount, tasksCount*tasksCount);
             var machinesRands = new int[machinesCount];
@@ -143,7 +118,7 @@ namespace SzeregowanieZadan
             var taskId = 0;
             for(var i = 0; i < machinesCount; i++)
             {
-                machinesRands[i] *= tasksCount / sum;
+                machinesRands[i] = Math.Max(1, machinesRands[i] * tasksCount / sum);
                 var currentTime = 0;
                 var avgTime = endTime / machinesRands[i];
                 while (currentTime < endTime)
@@ -151,12 +126,14 @@ namespace SzeregowanieZadan
                     var taskDuration = RandomGen.Next(avgTime * 2) + 1;
                     var taskReady = RandomGen.Next(currentTime + 1);
                     var estimatedEnd = currentTime + taskDuration + RandomGen.Next(avgTime);
-                    tasks.Add(new Task { Duration = taskDuration, Estimated = estimatedEnd, Start = taskReady });
+                    tasks.Add(new Task { Duration = taskDuration, Estimated = estimatedEnd, Start = taskReady, Id = taskId});
                     machines[i].AddTask(new Task {Duration = taskDuration, Estimated = estimatedEnd, Start = currentTime, Id = taskId++});
                     currentTime += taskDuration;
+                    if (tasks.Count == tasksCount) break;
                 }
 
                 machinesEndTime[i] = currentTime;
+                if (tasks.Count == tasksCount) break;
             }
 
             for (var i = tasks.Count; i < tasksCount; i++)
@@ -166,14 +143,22 @@ namespace SzeregowanieZadan
                 var taskDuration = RandomGen.Next(avgTime * 2) + 1;
                 var taskReady = RandomGen.Next(machinesEndTime[j] + 1);
                 var estimatedEnd = machinesEndTime[j] + taskDuration + RandomGen.Next(avgTime);
-                tasks.Add(new Task { Duration = taskDuration, Estimated = estimatedEnd, Start = taskReady });
+                tasks.Add(new Task { Duration = taskDuration, Estimated = estimatedEnd, Start = taskReady, Id = taskId});
                 machines[j].AddTask(new Task {Duration = taskDuration, Estimated = estimatedEnd, Start = machinesEndTime[j], Id = taskId++});
                 machinesEndTime[j] += taskDuration;
             }
 
-            CreateResultFile(machines, "optimum.txt");
             var strBuilder = new StringBuilder($"{tasksCount}\n");
             var shuffled = tasks.OrderBy(t => Guid.NewGuid()).ToList();
+            foreach (var machineTest in machines)
+            {
+                foreach (var task in machineTest.Tasks)
+                {
+                    task.Value.Id = shuffled.FindIndex(t => t.Id == task.Value.Id);
+                }
+            }
+            CreateResultFile(machines, "optimum.txt");
+
             for (var i = 0; i < tasksCount; i++)
             {
                 strBuilder.AppendLine($"{shuffled[i].Duration} {shuffled[i].Start} {shuffled[i].Estimated}");
@@ -231,8 +216,7 @@ namespace SzeregowanieZadan
                 }
 
                 endTime = currentTime + currentTask.Duration - 1;
-                currentTask.Start = currentTime;
-                machines[machineIter].AddTask(currentTask);
+                machines[machineIter].AddTask(new Task() {Duration = currentTask.Duration, Start = currentTime, Estimated = currentTask.Estimated, Id = currentTask.Id});
                 totalDelay += Math.Max(0, endTime - currentTask.Estimated);
 
             }
@@ -248,10 +232,9 @@ namespace SzeregowanieZadan
             return machines;
         }
 
-        private static List<Task> ParseTasks(string[] lines, out int maxTime)
+        private static List<Task> ParseTasks(string[] lines)
         {
             var tasks = new List<Task>(int.Parse(lines[0]));
-            maxTime = 0;
             for (var i = 1; i < lines.Length; i++)
             {
                 var split = lines[i].Split(' ');
@@ -263,7 +246,6 @@ namespace SzeregowanieZadan
                             Estimated = int.Parse(split[2]),
                             Id = i-1
                         });
-                maxTime = Math.Max(maxTime, tasks[i - 1].Estimated);
             }
             return tasks;
         }
@@ -271,7 +253,7 @@ namespace SzeregowanieZadan
         public static void Weryfikuj(string instance, string result)
         {
             var lines = File.ReadAllLines(instance);
-            var tasks = ParseTasks(lines, out var maxTime);
+            var tasks = ParseTasks(lines);
             var machines = InitializeMachines(Config.MACHINES_COUNT);
             lines = File.ReadAllLines(result);
             var totalDelay = 0;
@@ -281,7 +263,9 @@ namespace SzeregowanieZadan
                 var time = 0;
                 foreach (var taskId in taskIds)
                 {
-                    var id = int.Parse(taskId);
+                    var test = int.TryParse(taskId, out var id);
+                    if(!test) continue;
+                    
                     var currentTask = tasks[id];
                     var currentMachine = machines[i-1];
 
@@ -290,7 +274,7 @@ namespace SzeregowanieZadan
 
                     currentMachine.AddTask(time, time + currentTask.Duration - 1);
                     time += currentTask.Duration;
-                    totalDelay += Math.Max(0, time - currentTask.Estimated + 1);
+                    totalDelay += Math.Max(0, time - currentTask.Estimated);
                 }
             }
             Console.WriteLine($"Całkowity czas opóźnienia: {totalDelay}");
