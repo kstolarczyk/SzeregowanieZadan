@@ -4,11 +4,11 @@
     {
         public static readonly double INIT_PHEROMONES = 0.5;
 
-        public static readonly double ALPHA = 2;
+        public static readonly double ALPHA = 3;
 
-        public static readonly double BETA = 5;
+        public static readonly double BETA = 12;
 
-        public static readonly double QF = 0.5;
+        public static readonly double QF = 100;
 
         public static readonly int MACHINES_COUNT = 4;
 
@@ -18,8 +18,8 @@
 
         public static readonly int MAX_ITERATION = 1000;
 
-        public static readonly double EVAPORATION = 0.99;
+        public static readonly double EVAPORATION = 0.95;
 
-        public static readonly int ANTS = 20;
+        public static readonly int ANTS = 25;
     }
 }

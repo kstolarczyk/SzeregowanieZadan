@@ -5,14 +5,14 @@
 
     public class Graph
     {
-        public Graph(List<Task> tasks)
+        public Graph(List<Task> tasks, int initialBestValue)
         {
             Tasks = tasks;
             var tasksCount = tasks.Count;
             Pheromones = new double[tasksCount, tasksCount];
             InitPheromonesOnEdges(tasksCount);
             BestResult = new int[tasksCount];
-             BestResultValue = 157000;
+             BestResultValue = initialBestValue;
             Edges = new List<List<Edge>>(tasksCount);
             InitEdges(tasks, tasksCount);
         }

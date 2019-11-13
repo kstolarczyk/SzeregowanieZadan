@@ -101,7 +101,7 @@
                 {
                     _graph.BestResultValue = delay;
                     CopyCurrentResult();
-                    Console.WriteLine($"Best value: {delay}");
+                    // Console.WriteLine($"Best value: {delay}");
                 }
             }
         }
@@ -117,20 +117,21 @@
         public virtual void ApplyPheromones(List<int> result, int delay)
         {
             var quality = (double)_graph.BestResultValue / delay;
-            var pheromones = Config.QF * quality;
+            var pheromones = Config.QF * quality * quality;
             for (var i = 0; i < _tasksCount - 1; i++)
             {
                 var x = result[i];
                 var y = result[i + 1];
+
                 lock(_mutexPheromones[x, y])
                 {
-                    _graph.Pheromones[x, y] += pheromones;
+                    _graph.Pheromones[x, y] = pheromones / _graph.Edges[x][y].TimeDistance;
                 }
             }
         }
 
         public int ChooseNext(int from)
-        {
+        { 
             ComputeProbabilities(from);
             var rnd = RandomGen.NextDouble();
             return FindNext(rnd);
@@ -173,7 +174,7 @@
             {
                 var distance = _graph.Edges[from][next].TimeDistance + 1;
                 var pheromone = _graph.Pheromones[from, next];
-                var value = Math.Pow(1 + (10.0 / distance), Config.BETA) * Math.Pow(pheromone, Config.ALPHA);
+                var value =  (1.0 + Math.Pow(pheromone, Config.ALPHA )) / Math.Pow(distance, Config.BETA);
                 _probabilities[next] = value;
                 sum += value;
             }
@@ -190,13 +191,8 @@
         public int NaiveAlgorithm(IEnumerable<int> result)
         {
             var totalDelay = 0;
-            var totalTasks = 0;
             foreach (var taskIter in result)
             {
-                if (totalDelay > _graph.BestResultValue)
-                {
-                    return totalDelay * (_tasksCount / totalTasks);
-                }
 
                 var added = false;
                 var currentTask = _graph.Tasks[taskIter];
@@ -208,9 +204,8 @@
                 {
                     if (_machines[i].AddTask(currentTime, endTime))
                     {
-                        totalDelay += Math.Max(0, endTime - currentTask.Estimated);
+                        totalDelay += Math.Max(0, endTime - currentTask.Estimated+1);
                         added = true;
-                        totalTasks++;
                         break;
                     }
                 }
@@ -231,9 +226,8 @@
 
                 endTime = currentTime + currentTask.Duration - 1;
                 _machines[machineIter].AddTask(currentTime, endTime);
-                totalDelay += Math.Max(0, endTime - currentTask.Estimated);
-                totalTasks++;
-                
+                totalDelay += Math.Max(0, endTime - currentTask.Estimated+1);
+
             }
             ClearMachines();
             return totalDelay;
