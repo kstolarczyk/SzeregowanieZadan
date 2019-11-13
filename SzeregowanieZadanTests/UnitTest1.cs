@@ -30,7 +30,7 @@ namespace SzeregowanieZadanTests
         {
             _tasks = CreateTasks();
             _result = new int[] { 1, 5, 6, 3, 0, 4, 8, 7, 9, 2 };
-            _graph = new Graph(_tasks);
+            _graph = new Graph(_tasks, 100);
             _ant = new Ant(_graph, 4);
             _specialAnt = new SpecialAnt(_graph, 4);
         }

@@ -21,9 +21,10 @@ namespace SzeregowanieZadan
 
         static void Main(string[] args)
         {
-           
-            // GeneratePro(500,4, "instance2pro.txt");
-            var tasks = ParseTasks(File.ReadAllLines("instance2pro.txt"));
+
+            var instFile = "instance5pro.txt";
+            GeneratePro(500,4, instFile);
+            var tasks = ParseTasks(File.ReadAllLines(instFile));
             var machines = NaiveAlgorithm(tasks, out var totalDelay);
             CreateResultFile(machines, "naive.txt");
             machines = SortedAlgorithm(tasks, out _);
@@ -31,12 +32,12 @@ namespace SzeregowanieZadan
             machines = RandomAlgorithm(tasks, out _);
             CreateResultFile(machines, "random.txt");
             Console.WriteLine("\n --- Algorytm Naiwny ---");
-            Weryfikuj("instance2pro.txt", "naive.txt");
+            Weryfikuj(instFile, "naive.txt");
             Console.WriteLine("\n --- Algorytm naiwny z sortowaniem po czasie gotowości zadań ---");
-            Weryfikuj("instance2pro.txt", "sorted.txt");
+            Weryfikuj(instFile, "sorted.txt");
             Console.WriteLine("\n --- Algorytm naiwny z losowym posortowaniem");
-            Weryfikuj("instance2pro.txt", "random.txt");
-            Weryfikuj("instance2pro.txt", "optimum.txt");
+            Weryfikuj(instFile, "random.txt");
+            Weryfikuj(instFile, "optimum.txt");
 
             var graph = new Graph(tasks, totalDelay);
             var ants = new Ant[Config.ANTS];
@@ -71,7 +72,7 @@ namespace SzeregowanieZadan
             Console.WriteLine($"\nUpłynęło {timer.ElapsedMilliseconds} ms");
             ExportResult(graph, "ACO.txt");
             Console.WriteLine("\n Algorytm Mrówkowy (ACO)");
-            Weryfikuj("instance2pro.txt", "ACO.txt");
+            Weryfikuj(instFile, "ACO.txt");
             Console.ReadKey();
         }
 
