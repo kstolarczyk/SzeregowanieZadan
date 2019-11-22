@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SzeregowanieZadan", "Szereg
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SzeregowanieZadanTests", "SzeregowanieZadanTests\SzeregowanieZadanTests.csproj", "{07A09678-6BE9-4A3C-BBFD-E438A419A41C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Genetyk", "Genetyk\Genetyk.csproj", "{BA72462B-74B3-4534-B933-6A1152CA1979}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{07A09678-6BE9-4A3C-BBFD-E438A419A41C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{07A09678-6BE9-4A3C-BBFD-E438A419A41C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{07A09678-6BE9-4A3C-BBFD-E438A419A41C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BA72462B-74B3-4534-B933-6A1152CA1979}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BA72462B-74B3-4534-B933-6A1152CA1979}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BA72462B-74B3-4534-B933-6A1152CA1979}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BA72462B-74B3-4534-B933-6A1152CA1979}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

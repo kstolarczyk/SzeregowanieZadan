@@ -2,7 +2,7 @@
 
 namespace SzeregowanieZadan
 {
-    static class RandomGen
+    public static class RandomGen
     {
         private static Random _global = new Random();
         [ThreadStatic]

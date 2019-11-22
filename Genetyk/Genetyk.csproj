@@ -4,10 +4,10 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{703E9E10-F374-4D11-9E42-1841200947C7}</ProjectGuid>
+    <ProjectGuid>{BA72462B-74B3-4534-B933-6A1152CA1979}</ProjectGuid>
     <OutputType>Exe</OutputType>
-    <RootNamespace>SzeregowanieZadan</RootNamespace>
-    <AssemblyName>SzeregowanieZadan</AssemblyName>
+    <RootNamespace>Genetyk</RootNamespace>
+    <AssemblyName>Genetyk</AssemblyName>
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
@@ -45,19 +45,20 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Ant.cs" />
     <Compile Include="Config.cs" />
-    <Compile Include="Edge.cs" />
-    <Compile Include="Graph.cs" />
-    <Compile Include="Helper.cs" />
-    <Compile Include="Interval.cs" />
-    <Compile Include="Machine.cs" />
+    <Compile Include="GeneticAlgorithm.cs" />
+    <Compile Include="Individual.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="RandomGen.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SzeregowanieZadan\SzeregowanieZadan.csproj">
+      <Project>{703e9e10-f374-4d11-9e42-1841200947c7}</Project>
+      <Name>SzeregowanieZadan</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
