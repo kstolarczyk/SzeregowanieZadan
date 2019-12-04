@@ -36,12 +36,51 @@
         }
     }
 
-    public class IndividualComparer : IComparer<Individual>
+    public class IndividualComparer : IComparer<Individual2>
     {
-        public int Compare(Individual x, Individual y)
+        public int Compare(Individual2 x, Individual2 y)
         {
             if (x == null || y == null || x.Score == y.Score) return 0;
             return x.Score > y.Score ? 1 : -1;
+        }
+    }
+
+    public class Individual2
+    {
+        public List<int> StartingTasks { get; set; }
+        public int[] Edges { get; set; }
+        public int Score { get; set; }
+
+        public Individual2(int tasksCount)
+        {
+            StartingTasks = new List<int>(Config.MACHINES_COUNT);
+            Edges = new int[tasksCount+1];
+        }
+
+        public void GenerateChromosome(List<Task> tasks)
+        {
+            var tCount = tasks.Count;
+            tasks = tasks.OrderBy(t => t.Estimated - t.Duration + RandomGen.Next(200)).ToList();
+            var machines = Helper.NaiveAlgorithm(tasks, out var delay).ToList();
+            int prev, current = -1;
+            for (var i = 0; i < Config.MACHINES_COUNT; i++)
+            {
+                foreach (var task in machines[i].Tasks)
+                {
+                    prev = current;
+                    current = task.Value.Id;
+                    if (prev != -1)
+                    {
+                        Edges[prev] = current;
+                    }
+                    else
+                    {
+                        StartingTasks.Add(current);
+                    }
+                }
+                current = -1;
+            }
+            Score = delay;
         }
     }
 }

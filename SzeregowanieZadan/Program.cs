@@ -22,7 +22,7 @@ namespace SzeregowanieZadan
         static void Main(string[] args)
         {
 
-            var instFile = "test.txt";
+            var instFile = "in133896_500.txt";
             // Helper.GeneratePro(10,4, instFile);
             var tasks = Helper.ParseTasks(File.ReadAllLines(instFile));
             var machines = Helper.NaiveAlgorithm(tasks, out var totalDelay);
@@ -37,7 +37,7 @@ namespace SzeregowanieZadan
             Helper.Weryfikuj(instFile, "sorted.txt");
             Console.WriteLine("\n --- Algorytm naiwny z losowym posortowaniem");
             Helper.Weryfikuj(instFile, "random.txt");
-            Helper.Weryfikuj(instFile, "optimum.txt");
+            // Helper.Weryfikuj(instFile, "optimum.txt");
 
             var graph = new Graph(tasks, totalDelay);
             var ants = new Ant[Config.ANTS];

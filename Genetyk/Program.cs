@@ -11,7 +11,7 @@
         static void Main(string[] args)
         {
             // Helper.GeneratePro(40,4,"test.txt");
-            var tasks = Helper.ParseTasks(File.ReadAllLines("test.txt"));
+            var tasks = Helper.ParseTasks(File.ReadAllLines("instance2pro.txt"));
             var machines = Helper.SortedAlgorithm(tasks, out var delay);
             Console.WriteLine($"Sorted naive algorithm delay: {delay}");
             var watch = new Stopwatch();

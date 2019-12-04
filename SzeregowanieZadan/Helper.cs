@@ -179,7 +179,7 @@ namespace SzeregowanieZadan
                             Duration = int.Parse(split[0]),
                             Start = int.Parse(split[1]),
                             Estimated = int.Parse(split[2]),
-                            Id = i-1
+                            Id = i
                         });
             }
             return tasks;
@@ -201,7 +201,7 @@ namespace SzeregowanieZadan
                     var test = int.TryParse(taskId, out var id);
                     if(!test) continue;
                     
-                    var currentTask = tasks[id];
+                    var currentTask = tasks[id-1];
                     var currentMachine = machines[i-1];
 
                     currentTask.Start = Math.Max(currentTask.Start, time);

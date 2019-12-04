@@ -3,6 +3,7 @@
 namespace Genetyk
 {
     using System.Collections.Generic;
+    using System.Diagnostics;
     using System.Linq;
     using System.Runtime.InteropServices;
     using System.Threading;
@@ -16,11 +17,11 @@ namespace Genetyk
     {
         private List<Task> _tasks;
 
-        private Individual[] _population;
+        private Individual2[] _population;
 
         private object _mutex = new object();
 
-        private IComparer<Individual> _comparer;
+        private IComparer<Individual2> _comparer;
 
         private ThreadLocal<LinkedList<int>> _notVisited;
 
@@ -46,14 +47,14 @@ namespace Genetyk
                     new ParallelOptions() { MaxDegreeOfParallelism = Config.PROCESSORS_COUNT },
                     (j) =>
                         {
-                            var r1 = RandomGen.Next(Config.POPULATION_COUNT);
-                            var r2 = RandomGen.Next(Config.POPULATION_COUNT);
-                            var r3 = RandomGen.Next(Config.POPULATION_COUNT);
+                            var r1 = RandomGen.Next(totalIndividuals);
+                            var r2 = RandomGen.Next(totalIndividuals);
+                            var r3 = RandomGen.Next(totalIndividuals);
                             var individuals = BestOf3(r1, r2, r3);
-                            var child = CrossOver(individuals[0], individuals[1]);
+                            var child = CrossOver2(individuals[0], individuals[1]);
                             if (RandomGen.NextDouble() < Config.MUTATION_PROBABILITY)
                             {
-                                Mutation(ref child);
+                                // Mutation(ref child);
                             }
 
                             _population[j] = child;
@@ -64,9 +65,9 @@ namespace Genetyk
             Console.WriteLine($"Zakończono wyszukiwanie rozwiązania\nNajlepszy wynik: {_population[0].Score}");
         }
 
-        private Individual[] BestOf3(int r1, int r2, int r3)
+        private Individual2[] BestOf3(int r1, int r2, int r3)
         {
-            var individuals = new Individual[2];
+            var individuals = new Individual2[2];
             if (_population[r1].Score < _population[r2].Score)
             {
                 individuals[0] = _population[r1];
@@ -224,6 +225,86 @@ namespace Genetyk
             return child;
         }
 
+        public Individual2 CrossOver2(Individual2 parent1, Individual2 parent2)
+        {
+            var tCount = _tasks.Count;
+            var child = new Individual2(tCount);
+            var visited = new bool[tCount+1];
+            var fifo = new Queue<int>(4);
+            var machines = new Queue<int>(4);
+            var currentTimes = new int[Config.MACHINES_COUNT];
+
+            var parents = new Individual2[] {parent1, parent2};
+            var dodano = 0;
+            var totalLate = 0;
+            while (dodano < 4)
+            {
+                for (var i = 0; i < Config.MACHINES_COUNT; i++)
+                {
+                    var thisIter = RandomGen.Next(2);
+                    var current = parents[thisIter].StartingTasks[i];
+                    if (visited[current])
+                    {
+                        current = parents[-thisIter+1].StartingTasks[i];
+                    }
+                    if (visited[current]) continue;
+                    child.StartingTasks.Add(current);
+                    visited[current] = true;
+                    fifo.Enqueue(current);
+                    machines.Enqueue(i);
+                    currentTimes[i] = Math.Max(currentTimes[i], _tasks[current].Start) + _tasks[current].Duration;
+                    dodano++;
+                    if (dodano >= 4) break;
+                }
+            }
+            var currentIds = child.StartingTasks.ToArray();
+            while (fifo.Count > 0)
+            {
+                var current = fifo.Dequeue();
+                var thisIter = RandomGen.Next(2);
+                var machineId = machines.Dequeue();
+                var next = parents[thisIter].Edges[current];
+                if (next == 0 || visited[next])
+                {
+                    next = parents[-thisIter + 1].Edges[current];
+                }
+                if (next == 0 || visited[next])
+                {
+                    continue;
+                }
+                child.Edges[current] = next;
+                visited[next] = true;
+                fifo.Enqueue(next);
+                machines.Enqueue(machineId);
+                currentIds[machineId] = next;
+                var currentTask = _tasks[next-1];
+                currentTimes[machineId] = Math.Max(currentTimes[machineId], currentTask.Start) + currentTask.Duration;
+                totalLate += Math.Max(0, currentTimes[machineId] - currentTask.Estimated);
+            }
+
+            for (var i = 1; i <= tCount; i++)
+            {
+                if (visited[i]) continue;
+                var currentTask = _tasks[i-1];
+                var bestMachine = 0;
+                var bestTime = int.MaxValue;
+                for (var j = 0; j < currentIds.Length; j++)
+                {
+                    if (currentTimes[j] < bestTime)
+                    {
+                        bestTime = currentTimes[j];
+                        bestMachine = j;
+                    }
+                }
+                child.Edges[currentIds[bestMachine]] = currentTask.Id;
+                currentTimes[bestMachine] = Math.Max(currentTimes[bestMachine], currentTask.Start) + currentTask.Duration;
+                currentIds[bestMachine] = currentTask.Id;
+                totalLate += Math.Max(0, currentTimes[bestMachine] - currentTask.Estimated);
+            }
+            child.Score = totalLate;
+            return child;
+        }
+
 
         public void Selection()
         {
@@ -289,16 +370,16 @@ namespace Genetyk
             individual.Score = delay;
         }
 
-        public Individual[] InitialPopulation()
+        public Individual2[] InitialPopulation()
         {
-            var population = new Individual[Config.POPULATION_COUNT + Config.REJECTION_COUNT];
+            var population = new Individual2[Config.POPULATION_COUNT + Config.REJECTION_COUNT];
             Parallel.For(
                 0,
-                Config.POPULATION_COUNT,
+                Config.POPULATION_COUNT + Config.REJECTION_COUNT,
                 new ParallelOptions() { MaxDegreeOfParallelism = Config.PROCESSORS_COUNT },
                 i =>
                     {
-                        var individual = new Individual(_tasks.Count);
+                        var individual = new Individual2(_tasks.Count);
                         individual.GenerateChromosome(_tasks);
                         population[i] = individual;
                     });

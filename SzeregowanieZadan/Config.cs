@@ -1,6 +1,6 @@
 ﻿namespace SzeregowanieZadan
 {
-    public static class Config
+    internal static class Config
     {
         public static readonly double INIT_PHEROMONES = 0.5;
 
